@@ -1,0 +1,42 @@
+name: create-branch-from-upstream
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: "Tag/branch/commit en rusefi/rusefi (ej: 2024-04-18 o 317daf6)"
+        required: true
+        default: "317daf6"
+      new_branch:
+        description: "Nombre de la rama nueva en TU fork"
+        required: true
+        default: "rel-2024-04-18"
+
+jobs:
+  make-branch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: |
+          git config user.email "actions@github.com"
+          git config user.name  "github-actions[bot]"
+          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git remote add upstream https://github.com/rusefi/rusefi.git || true
+          git fetch upstream --tags --prune --depth=0
+      - name: Create branch
+        env:
+          UP:  ${{ inputs.upstream_ref }}
+          NEW: ${{ inputs.new_branch }}
+        run: |
+          set -e
+          if git rev-parse -q --verify "upstream/$UP" >/dev/null; then SRC="upstream/$UP";
+          elif git rev-parse -q --verify "refs/tags/$UP" >/dev/null; then SRC="refs/tags/$UP";
+          else SRC="$UP"; fi
+          git checkout --detach "$SRC"
+          git switch -c "$NEW"
+          git log -1 --oneline
+          git push -u origin "$NEW" --force
